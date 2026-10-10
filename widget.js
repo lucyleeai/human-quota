@@ -140,17 +140,20 @@ function slot(rings, glyph, value, valueColor, url, note = " ") {
   ctx.size = new Size(74, 74); ctx.opaque = false; ctx.respectScreenScale = true;
   rings.forEach((r, i) => arc(ctx, 32 - i * 9, i ? 5 : 6, r.percent, r.hex));
   const column = metrics.addStack(); column.layoutVertically(); if (url) column.url = url;
-  const ring = column.addStack(); ring.size = new Size(74, 74); ring.backgroundImage = ctx.getImage();
+  const ringRow = column.addStack(); ringRow.size = new Size(96, 74); ringRow.addSpacer();
+  const ring = ringRow.addStack(); ringRow.addSpacer(); ring.size = new Size(74, 74); ring.backgroundImage = ctx.getImage();
   ring.centerAlignContent(); ring.addSpacer();
   const icon = ring.addImage(glyph); icon.imageSize = new Size(18, 18); icon.tintColor = white;
   ring.addSpacer();
   column.addSpacer(8);
-  const row = column.addStack(); row.size = new Size(74, 0); row.addSpacer();
+  const row = column.addStack(); row.size = new Size(96, 0); row.addSpacer();
   const text = row.addText(value); text.font = Font.semiboldSystemFont(17); text.textColor = valueColor;
   text.lineLimit = 1; text.minimumScaleFactor = 0.6; row.addSpacer();
   // Second line: the glucose reading's measurement time; blank for quota so all numbers line up.
-  const noteRow = column.addStack(); noteRow.size = new Size(74, 0); noteRow.addSpacer();
-  const small = noteRow.addText(note); small.font = Font.mediumSystemFont(10); small.textColor = muted; noteRow.addSpacer();
+  // One line only, wider than the ring: a wrapped note would push this column's number out of line.
+  const noteRow = column.addStack(); noteRow.size = new Size(96, 0); noteRow.addSpacer();
+  const small = noteRow.addText(note); small.font = Font.mediumSystemFont(10); small.textColor = muted;
+  small.lineLimit = 1; small.minimumScaleFactor = 0.7; noteRow.addSpacer();
   metrics.addSpacer();
 }
 const glyph = id => GLYPHS[id] ? Image.fromData(Data.fromBase64String(GLYPHS[id])) : SFSymbol.named("circle.dashed").image;
@@ -179,8 +182,10 @@ for (const id of S.codexbarUrl ? S.providers.slice(0, S.nightscoutUrl ? 2 : 3) :
   const single = q.weekly && !q.session; // remembered from the last good fetch, so offline keeps the shape
   const ring = w => ({percent: w?.remaining ?? null, hex: tone(w?.remaining ?? 100)});
   const tight = [session, weekly].filter(Boolean).sort((a, b) => a.remaining - b.remaining)[0];
+  // Name the window behind the number, so Claude's 5-hour % isn't read as comparable to Codex's weekly %.
   slot(single ? [ring(weekly)] : [ring(weekly), ring(session)], glyph(id),
-       tight ? Math.round(tight.remaining) + "%" : "—", tight ? white : muted);
+       tight ? Math.round(tight.remaining) + "%" : "—", tight ? white : muted, null,
+       tight ? (tight === session ? "5-hour" : "weekly") : " ");
 }
 widget.addSpacer();
 Script.setWidget(widget);
