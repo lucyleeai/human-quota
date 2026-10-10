@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Copy to ~/Library/LaunchAgents/, replace TAILSCALE_IP and TOKEN, then:
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/codexbar-serve.plist -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>codexbar-serve</string>
+  <key>ProgramArguments</key><array>
+    <string>/opt/homebrew/bin/codexbar</string><string>serve</string>
+    <string>--host</string><string>TAILSCALE_IP</string><string>--port</string><string>8784</string>
+    <string>--allow-plain-http</string><string>--identity</string><string>redacted</string>
+  </array>
+  <key>EnvironmentVariables</key><dict><key>CODEXBAR_DASHBOARD_TOKEN</key><string>TOKEN</string></dict>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ThrottleInterval</key><integer>30</integer>
+</dict></plist>
