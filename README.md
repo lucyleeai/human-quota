@@ -14,7 +14,9 @@ Works with Codex · Claude · any CodexBar provider · optional CGM glucose via 
 
 </div>
 
-![human-quota widget: glucose, Claude and Codex rings](docs/widget.png)
+![human-quota widget: glucose, Claude and Codex rings](docs/demo.gif)
+
+▶︎ [Watch the 30-second video (with sound)](docs/human-quota.mp4)
 
 ## What it helps with
 
@@ -169,6 +171,8 @@ Runs `install.js` (which downloads and runs `widget.js`) against a fake Scriptab
 - [steipete/CodexBar](https://github.com/steipete/CodexBar) (MIT): quota reading, `codexbar serve`, and the provider glyphs embedded in `widget.js`
 - [nightscout/cgm-remote-monitor](https://github.com/nightscout/cgm-remote-monitor) (AGPL-3.0): CGM data platform
 - [Scriptable](https://scriptable.app): the iOS runtime for the widget
+
+Demo video: voice-over generated with OpenAI gpt-audio and music with Google Lyria (both AI-generated); sound effects from Pixabay (Pixabay Content License) and synthesized locally; handwriting font [Excalifont](https://github.com/excalidraw/excalidraw) (SIL OFL 1.1).
 
 ## License
 
