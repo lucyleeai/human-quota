@@ -167,7 +167,8 @@ if (S.nightscoutUrl) {
   const mmol = reading ? reading.mgdl / 18 : null;
   const value = reading ? (S.units === "mmol" ? mmol.toFixed(1) : String(reading.mgdl)) + (valid ? reading.arrow : "") : "—";
   // The sensor's own measurement time, not the widget's refresh time: CGM data arrives with a delay.
-  const measured = reading ? new Date(reading.at * 1000).toTimeString().slice(0, 5) : " ";
+  // Tapping this column opens the log; "＋ Log" says so without breaking the ring.
+  const measured = (reading ? new Date(reading.at * 1000).toTimeString().slice(0, 5) + " · " : "") + "＋ Log";
   slot([{percent: valid ? 100 : null, hex: valid ? glucoseTone(reading.mgdl) : GREEN}], SFSymbol.named("drop.fill").image,
        value, valid ? white : muted, runURL + "?log=1", measured);
 }

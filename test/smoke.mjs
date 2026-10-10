@@ -80,7 +80,7 @@ assert.ok(r.strokes.includes("FFCC00") && !r.strokes.includes("FF3B30"), "high (
 r = await run({sgv: 270});
 assert.ok(r.strokes.includes("FF9500"), "very high (>250) is orange");
 r = await run();
-assert.ok(r.texts.includes(new Date(now - 60000).toTimeString().slice(0, 5)), "shows the sensor's measurement time under glucose");
+assert.ok(r.texts.includes(new Date(now - 60000).toTimeString().slice(0, 5) + " · ＋ Log"), "measurement time and the log entry under glucose");
 
 const cached = r.files;
 r = await run({fail: {source: true}, files: {...cached}});
