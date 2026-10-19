@@ -20,9 +20,9 @@ const routes = {
 function run({settings = true, log = false, fail = {}, files = {}, source = read("widget.js"), sgv = 74} = {}) {
   routes["/api/v1/entries/sgv.json"] = [{sgv, date: now - 60000, direction: "Flat"}];
   const texts = [], colors = [], posts = [], alerts = [], strokes = [];
-  class Color { constructor(hex) { this.hex = hex; } }
+  class Color { constructor(hex, alpha = 1) { this.hex = hex; this.alpha = alpha; } }
   class Stack { addStack() { return new Stack(); } addSpacer() {}
-    addText(t) { texts.push(t); const el = {}; Object.defineProperty(el, "textColor", {set: c => colors.push([t, c?.hex])}); return el; }
+    addText(t) { texts.push(t); const el = {}; Object.defineProperty(el, "textColor", {set: c => colors.push([t, c?.hex, c?.alpha])}); return el; }
     addDate() { return {applyTimeStyle() {}, applyDateStyle() {}}; }
     addImage() { return {}; } layoutVertically() {} centerAlignContent() {} topAlignContent() {} setPadding() {} }
   class Request {
@@ -95,6 +95,16 @@ assert.ok(r.texts.includes("—") && !r.texts.includes("15%"), "failed quota sho
 
 r = await run({settings: false});
 assert.ok(r.texts.includes("Open the script to add your settings"));
+
+// An hours-old reading (you haven't used Claude Code since) stays visible, dimmed, with its time.
+const claudeSnap = routes["/dashboard/v1/snapshot"].providers[1], freshAt = claudeSnap.updatedAt;
+claudeSnap.updatedAt = iso(-3 * 3600e3);
+r = await run();
+const asOf = new Date(now - 3 * 3600e3).toTimeString().slice(0, 5);
+assert.ok(r.texts.includes("15%") && r.texts.includes(asOf + " · 5-hour"), "old reading keeps its number and shows its time");
+assert.ok(r.colors.some(([t, , a]) => t === "15%" && a < 1), "old reading is dimmed, not white");
+assert.ok(r.texts.includes("89%") && r.texts.includes("weekly"), "a fresh provider next to it is unaffected");
+claudeSnap.updatedAt = freshAt;
 
 r = await run({log: true});
 assert.equal(r.posts.length, 1);

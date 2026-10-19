@@ -42,8 +42,10 @@ Heavy AI users check their Claude quota all day and forget their own: blood suga
    │
    │  Tailscale (private, encrypted)
    │
-   ├──► Mac: codexbar serve  ── GET /dashboard/v1/snapshot  (Bearer token)
-   │        └─ CodexBar app keeps provider logins, cookies and Keychain access fresh
+   ├──► Mac: mac/serve.py  ── GET /dashboard/v1/snapshot  (Bearer token)
+   │        ├─ Claude: the rate limits Claude Code hands its status line (mac/statusline-tap.py)
+   │        └─ Codex: the rate_limits events in Codex's own session logs
+   │        (or `codexbar serve`, same snapshot format, for other providers)
    │
    └──► Nightscout (optional) ── GET  /api/v1/entries/sgv.json   (latest glucose)
             ▲                    POST /api/v1/treatments         (notes you log)
@@ -60,13 +62,37 @@ The lesson: **don't own the messy auth layer.** The widget is now thin glue over
 - **[CodexBar](https://github.com/steipete/CodexBar)** (MIT, macOS 14+ and a Linux CLI) reads Codex, Claude and many other providers through OAuth, browser cookies or a CLI. `codexbar serve` exposes a token-protected JSON snapshot.
 - **[Nightscout](https://github.com/nightscout/cgm-remote-monitor)** (AGPL-3.0) is the standard open platform for CGM data, and many CGM users already run it.
 
-There is no server code of ours. No data leaves your devices except to services you already run.
+No data leaves your devices except to services you already run.
+
+**v0.2: no logins at all for Claude and Codex.** CodexBar still needed logins: claude.ai browser cookies or a Claude token, which kept expiring, and the CodexBar app can grow to gigabytes of memory over a day ([#2637](https://github.com/steipete/CodexBar/issues/2637), [#4486](https://github.com/steipete/CodexBar/issues/4486)). But both tools already write their limits down on the Mac:
+
+- After every reply, Claude Code passes `rate_limits.five_hour` and `rate_limits.seven_day` (percent used, reset time) to your status line command. This is a [documented field](https://code.claude.com/docs/en/statusline#available-data). `mac/statusline-tap.py` saves it to `~/.human-quota/claude.json` and then runs your usual status line command.
+- Codex writes `rate_limits` into its session logs under `~/.codex/sessions` with every reply.
+
+`mac/serve.py` (Python standard library only, about 17 MB of memory) reads those two files and serves the same snapshot as `codexbar serve`, so the phone side didn't change. It reads no token, cookie or Keychain item and makes no network calls. The trade-off: a number only updates when you use Claude Code or Codex. While you're away it stays at the last reading, which the widget shows dimmed with its time.
 
 ## Quick start
 
 You need a Mac that stays on, an iPhone with [Scriptable](https://scriptable.app) (free), and [Tailscale](https://tailscale.com) on both (the free personal plan works) so the phone reaches the Mac privately from anywhere. Skip step 1 or step 2 if you only want one half.
 
-### 1. Quota via CodexBar
+### 1. Quota
+
+**Claude Code and Codex, no logins (default since v0.2).** Copy `mac/statusline-tap.py` and `mac/serve.py` to `~/opt/human-quota/`. In `~/.claude/settings.json`, put the tap in front of your current status line command (or leave the part after `--` out if you have none):
+
+```json
+"statusLine": {"type": "command",
+  "command": "/usr/bin/python3 ~/opt/human-quota/statusline-tap.py -- <your current status line command>"}
+```
+
+Then serve the snapshot on your tailnet IP:
+
+```sh
+HQ_TOKEN=<random> HQ_HOSTS=127.0.0.1,$(tailscale ip -4) HQ_PORT=8784 /usr/bin/python3 ~/opt/human-quota/serve.py
+```
+
+To start it at login, copy [`mac/human-quota-serve.plist`](mac/human-quota-serve.plist) to `~/Library/LaunchAgents/`, replace `TAILSCALE_IP`, `TOKEN` and `HOME`, then run `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/human-quota-serve.plist`. Check it with `python3 ~/opt/human-quota/serve.py --print`.
+
+**Other providers: CodexBar.** For Cursor, Gemini and the rest, use CodexBar instead; the widget reads the same snapshot.
 
 ```sh
 brew install --cask codexbar             # or download from GitHub releases
@@ -111,9 +137,9 @@ All settings live in the `SETTINGS` object at the top of `install.js`. Leave a U
 
 | Key | Default | What it does |
 |---|---|---|
-| `codexbarUrl` | `""` | Your `codexbar serve` address, e.g. `http://<tailscale-ip>:8784`. Empty hides the quota rings. |
-| `codexbarToken` | `""` | The `CODEXBAR_DASHBOARD_TOKEN` you set on the Mac. |
-| `providers` | `["claude", "codex"]` | CodexBar provider IDs to draw. Two fit next to glucose; up to three without Nightscout. |
+| `codexbarUrl` | `""` | Your snapshot server address (`mac/serve.py` or `codexbar serve`), e.g. `http://<tailscale-ip>:8784`. Empty hides the quota rings. The name stays for compatibility. |
+| `codexbarToken` | `""` | The token you set on the Mac (`HQ_TOKEN` or `CODEXBAR_DASHBOARD_TOKEN`). |
+| `providers` | `["claude", "codex"]` | Provider IDs to draw. Two fit next to glucose; up to three without Nightscout. |
 | `nightscoutUrl` | `""` | Your Nightscout URL. Empty hides the glucose slot. |
 | `nightscoutToken` | `""` | A token with the roles `readable` and `careportal`. |
 | `units` | `"mmol"` | Glucose units: `"mmol"` (mmol/L) or `"mg/dL"`. |
@@ -131,7 +157,7 @@ A medium widget with up to three slots side by side, laid out like the iOS Batte
 - **Ring colours** are Apple's system colours as the Battery widget uses them: green `#34C759`, yellow `#FFCC00` at 20% left or less, red `#FF3B30` at 10% or less. iOS gives every widget the same Home Screen treatment, so they match a Battery widget sitting next to this one.
 - **Provider glyphs** come from CodexBar and are embedded in `widget.js`. A provider without a glyph gets a generic SF Symbol.
 - **Model-scoped extra windows** (e.g. a model-only weekly limit) are ignored in v1.
-- **Stale data is never shown as current.** Quota older than 15 minutes or failed to load shows `—` with only the ring's track. Glucose older than 10 minutes, or unreachable, is dimmed with no arrow and an empty ring. A quota outage doesn't hide glucose, and vice versa.
+- **Stale data is never shown as current.** A quota reading older than 15 minutes keeps its number, dimmed, with the reading's time under it (for example `14:05 · weekly`); once a window's reset time passes, the server shows it as full again. A Mac that can't be reached, or a provider with no reading yet, shows `—` with only the ring's track. Glucose older than 10 minutes, or unreachable, is dimmed with no arrow and an empty ring. A quota outage doesn't hide glucose, and vice versa.
 
 **Logging a meal:** tap the blood-drop slot. Scriptable opens a native prompt, "What did you eat or drink?", so iOS dictation works. The note is saved as a Nightscout `Note` treatment and appears on the Nightscout chart next to your glucose. If saving fails, the note stays on the phone, and you can try again now or later. A retry never duplicates, because Nightscout upserts on `created_at` + `eventType`: the same 6-note batch posted 3 times still left 6 notes.
 
@@ -157,18 +183,19 @@ For a fork, point `SOURCE` at your fork's `widget.js` instead.
 node test/smoke.mjs
 ```
 
-Runs `install.js` (which downloads and runs `widget.js`) against a fake Scriptable runtime and canned API responses, with no network and no iPhone. It checks one number per slot (Claude shows the lower window, Codex its weekly), no names or window labels as text, yellow at 20% or less, green for healthy rings and in-range glucose, glucose under 3.9 mmol/L turning red, the loader's offline fallback, that a broken download never replaces the working copy, that a quota outage doesn't hide glucose and shows `—`, the empty-settings hint, and log posting.
+Runs `install.js` (which downloads and runs `widget.js`) against a fake Scriptable runtime and canned API responses, with no network and no iPhone. It checks one number per slot (Claude shows the lower window, Codex its weekly), no names or window labels as text, yellow at 20% or less, green for healthy rings and in-range glucose, glucose under 3.9 mmol/L turning red, the loader's offline fallback, that a broken download never replaces the working copy, that a quota outage doesn't hide glucose and shows `—`, the empty-settings hint, log posting, and that an hours-old quota reading stays visible, dimmed and with its time.
 
 ## Limits
 
 - **iOS decides when the widget refreshes.** The script asks for every 5 minutes; iOS doesn't guarantee it.
-- **Claude may occasionally need you to reopen claude.ai in your browser,** because CodexBar reads it through browser cookies. The CodexBar app handles re-import, but it can't promise never.
+- **Numbers move only when you use Claude Code or Codex** (with `mac/serve.py`). Usage on claude.ai or in the ChatGPT app shows up at your next Claude Code or Codex reply. Headless runs (`claude -p`) don't draw a status line, so they don't update the Claude reading.
+- **These are each tool's own fields,** not a public API. If Claude Code or Codex renames them, the widget shows `—` until `serve.py` is updated.
 - **Not a medical device.** Don't make treatment decisions from a widget.
 - **Tested by one person** on one Mac mini and one iPhone so far.
 
 ## Credits
 
-- [steipete/CodexBar](https://github.com/steipete/CodexBar) (MIT): quota reading, `codexbar serve`, and the provider glyphs embedded in `widget.js`
+- [steipete/CodexBar](https://github.com/steipete/CodexBar) (MIT): the snapshot format `mac/serve.py` follows, `codexbar serve` for other providers, and the provider glyphs embedded in `widget.js`
 - [nightscout/cgm-remote-monitor](https://github.com/nightscout/cgm-remote-monitor) (AGPL-3.0): CGM data platform
 - [Scriptable](https://scriptable.app): the iOS runtime for the widget
 

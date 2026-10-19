@@ -177,15 +177,20 @@ if (S.nightscoutUrl) {
 }
 for (const id of S.codexbarUrl ? S.providers.slice(0, S.nightscoutUrl ? 2 : 3) : []) {
   const q = data.quota?.[id] || {};
-  const live = !quotaOffline && fresh(q.at, 900);
-  const session = live ? q.session : null, weekly = live ? q.weekly : null;
+  // A reading comes from the last Claude Code / Codex reply, so it can be hours old while you're away.
+  // Keep showing it, dimmed and with its time, like old glucose; the server resets a window once its
+  // reset time passes. Only a missing reading, or an unreachable Mac, shows "—".
+  const known = !quotaOffline && Number.isFinite(q.at);
+  const live = known && fresh(q.at, 900);
+  const session = known ? q.session : null, weekly = known ? q.weekly : null;
   const single = q.weekly && !q.session; // remembered from the last good fetch, so offline keeps the shape
   const ring = w => ({percent: w?.remaining ?? null, hex: tone(w?.remaining ?? 100)});
   const tight = [session, weekly].filter(Boolean).sort((a, b) => a.remaining - b.remaining)[0];
   // Name the window behind the number, so Claude's 5-hour % isn't read as comparable to Codex's weekly %.
+  const label = tight ? (tight === session ? "5-hour" : "weekly") : " ";
+  const asOf = tight && !live ? new Date(q.at * 1000).toTimeString().slice(0, 5) + " · " : "";
   slot(single ? [ring(weekly)] : [ring(weekly), ring(session)], glyph(id),
-       tight ? Math.round(tight.remaining) + "%" : "—", tight ? white : muted, null,
-       tight ? (tight === session ? "5-hour" : "weekly") : " ");
+       tight ? Math.round(tight.remaining) + "%" : "—", tight && live ? white : muted, null, asOf + label);
 }
 widget.addSpacer();
 Script.setWidget(widget);

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Copy to ~/Library/LaunchAgents/, replace TAILSCALE_IP, TOKEN and HOME, then:
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/human-quota-serve.plist -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>human-quota-serve</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string><string>HOME/opt/human-quota/serve.py</string>
+  </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>HQ_TOKEN</key><string>TOKEN</string>
+    <key>HQ_HOSTS</key><string>127.0.0.1,TAILSCALE_IP</string>
+    <key>HQ_PORT</key><string>8784</string>
+  </dict>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ThrottleInterval</key><integer>30</integer>
+</dict></plist>
